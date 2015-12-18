@@ -6,6 +6,7 @@
     "component",
     "kontur"
   ],
+  "minimum-stability": "dev",
   "license": "MIT",
   "authors": [
     {
@@ -14,20 +15,12 @@
     }
   ],
   "require": {
-    "carono/murl": "dev-master",
     "electrolinux/phpquery": "^0.9.6",
     "danielstjules/stringy": "^2.1"
   },
-  "repositories": [
-    {
-      "type": "vcs",
-      "url": "https://github.com/carono/yii2-components"
-    },
-    {
-      "type": "vcs",
-      "url": "https://github.com/carono/murl"
-    }
-  ],
+  "require-dev": {
+    "carono/murl": "dev-master"
+  },
   "autoload": {
     "psr-4": {
       "carono\\company\\": ""
