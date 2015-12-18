@@ -17,8 +17,8 @@ class Kontur extends absKontur
 		$newKeys = [];
 		foreach (array_keys($data) as $key) {
 			$key = trim($key);
-			if (in_array(S::create($key)->toLowerCase(), array_keys(self::$names))) {
-				$newKeys[] = self::$names[S::create($key)->toLowerCase()->__toString()];
+			if (in_array(S::create($key, "UTF-8")->toLowerCase()->__toString(), array_keys(self::$names))) {
+				$newKeys[] = self::$names[S::create($key, "UTF-8")->toLowerCase()->__toString()];
 			} else {
 				$newKeys[] = $key;
 			}
@@ -256,7 +256,7 @@ class Kontur extends absKontur
 		$create_date = strip_tags($phpQuery->html());
 		$arr = explode(':', $create_date);
 		foreach ($arr as $path) {
-			if ($timestamp = strftime($path)) {
+			if ($timestamp = strtotime($path)) {
 				return date('Y-m-d H:i:s', $timestamp);
 			}
 		}
