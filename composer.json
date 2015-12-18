@@ -1,0 +1,36 @@
+{
+  "name": "carono/company-info",
+  "description": "Get company info (RUS)",
+  "type": "component",
+  "keywords": [
+    "component",
+    "kontur"
+  ],
+  "license": "MIT",
+  "authors": [
+    {
+      "name": "Alexander Kasyanov",
+      "email": "spamer2000@yandex.ru"
+    }
+  ],
+  "require": {
+    "carono/murl": "dev-master",
+    "electrolinux/phpquery": "^0.9.6",
+    "danielstjules/stringy": "^2.1"
+  },
+  "repositories": [
+    {
+      "type": "vcs",
+      "url": "https://github.com/carono/yii2-components"
+    },
+    {
+      "type": "vcs",
+      "url": "https://github.com/carono/murl"
+    }
+  ],
+  "autoload": {
+    "psr-4": {
+      "carono\\company\\": ""
+    }
+  }
+}
