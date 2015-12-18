@@ -1,5 +1,6 @@
 {
   "name": "carono/company-info",
+  "version": "0.1.0",
   "description": "Get company info (RUS)",
   "type": "component",
   "keywords": [
@@ -19,7 +20,7 @@
     "danielstjules/stringy": "^2.1"
   },
   "require-dev": {
-    "carono/murl": "dev-master"
+    "carono/murl": "*"
   },
   "autoload": {
     "psr-4": {
