@@ -77,7 +77,7 @@ class Kontur extends absKontur
 	 */
 	public static function extractCity($address)
 	{
-		//http://xmlcon.ru/index.php?catid=3:instrcat&id=32:2012-06-23-15-57-08&Itemid=31&option=com_content&view=article
+		//http://www.oktmo.ru/list_localitytypes/
 		$arr = explode(', ', $address);
 		$result = '';
 		foreach ($arr as $element) {
