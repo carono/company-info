@@ -1,6 +1,10 @@
 <?php
+namespace carono\company;
 
-class CompanyInfo
+use GuzzleHttp\Client;
+use Smalot\PdfParser\Parser;
+
+class Egrul
 {
     static public $filesFolder = 'application.runtime.company.pdf';
     static public $debugFolder = 'application.runtime.company.debug';
@@ -8,10 +12,13 @@ class CompanyInfo
     const CACHE_PREFIX = "CompanyInfo_";
     const DOMAIN = 'https://egrul.nalog.ru';
 
-    /** @var PDFParser */
     static public $debug = false;
     static private $_number;
+    /** @var Parser */
     static private $_pdfParser;
+    /**
+     * @var Client
+     */
     static private $_parser;
     static private $_rawInfo;
     static private $_group = '';
@@ -133,71 +140,78 @@ class CompanyInfo
 
     public static function setCache($number, $data)
     {
-        if (self::$useCache) {
-            return Yii::app()->cache->set(self::CACHE_PREFIX . $number, $data, 3600);
-        }
-        return false;
+//        if (self::$useCache) {
+//            return Yii::app()->cache->set(self::CACHE_PREFIX . $number, $data, 3600);
+//        }
+//        return false;
     }
 
     public static function getFromCache($number)
     {
-        if (self::$useCache) {
-            return Yii::app()->cache->get(self::CACHE_PREFIX . $number);
-        }
-        return false;
+//        if (self::$useCache) {
+//            return Yii::app()->cache->get(self::CACHE_PREFIX . $number);
+//        }
+//        return false;
     }
 
 
     private static function getFileUrl($number, $isOrganization, $captchaToken, $recognizedCaptcha)
     {
         $parser = self::getParser();
-        $parser->headers->X_Requested_With = "XMLHttpRequest";
-        $parser->headers->Accept = "application/json, text/javascript, */*; q=0.01";
-        $parser->headers->Content_Type = "application/x-www-form-urlencoded";
-        $parser->headers->Accept_Encoding = "gzip,deflate";
-        $parser->headers->Accept_Charset = "UTF-8,*;q=0.5";
+        $headers = [
+            'X-Requested-With' => "XMLHttpRequest",
+            'Accept'           => "application/json, text/javascript, */*; q=0.01",
+            'Content-Type'     => "application/x-www-form-urlencoded",
+            'Accept-Encoding'  => "gzip,deflate",
+            'Accept-Charset'   => "UTF-8,*;q=0.5"
+        ];
 
 
-        $parser->post["method"] = "post";
-        $parser->post["kind"] = $isOrganization ? "ul" : "fl";
-        $parser->post["srchUl"] = "ogrn";
-        $parser->post["ogrninnul"] = $isOrganization ? $number : "";
-        $parser->post["regionul"] = "";
-        $parser->post["srchFl"] = "ogrn";
-        $parser->post["ogrninnfl"] = !$isOrganization ? $number : "";
-        $parser->post["namul"] = "";
-        $parser->post["fam"] = "";
-        $parser->post["nam"] = "";
-        $parser->post["otch"] = "";
-        $parser->post["region"] = "";
-        $parser->post["captcha"] = $recognizedCaptcha;
-        $parser->post["captchaToken"] = $captchaToken;
-
-        $content = $parser->getContent(self::DOMAIN);
-        $parser->post = [];
-        return json_decode($content, 1);
+        $post = [
+            "method"       => "post",
+            "kind"         => $isOrganization ? "ul" : "fl",
+            "srchUl"       => "ogrn",
+            "ogrninnul"    => $isOrganization ? $number : "",
+            "regionul"     => "",
+            "srchFl"       => "ogrn",
+            "ogrninnfl"    => !$isOrganization ? $number : "",
+            "namul"        => "",
+            "fam"          => "",
+            "nam"          => "",
+            "otch"         => "",
+            "region"       => "",
+            "captcha"      => $recognizedCaptcha,
+            "captchaToken" => $captchaToken
+        ];
+        $data = [
+            'form_params' => $post,
+            'headers'     => $headers
+        ];
+        $request = $parser->request('post', self::DOMAIN, $data);
+        $content = $request->getBody();
+        return json_decode($content, true);
     }
 
     private static function extractCaptcha()
     {
         $parser = self::getParser();
-        if (!$content = $parser->getContent(self::DOMAIN)) {
-            CompanyException::downloadError();
-        }
+        $response = $content = $parser->request('GET', self::DOMAIN);
+        $content = $response->getBody();
         preg_match('/<img[^>]*?src=\"(\/static\/captcha.html\?a=(.*))\"/iU', $content, $arr);
-        
+
         if (is_array($arr) && count($arr)) {
             $url = self::DOMAIN . $arr[1];
             $captchaToken = $arr[2];
             return ["url" => $url, "token" => $captchaToken];
         } else {
-            throw new Exception("Not find", 1);
+            EgrulException::raiseNotFound();
         }
     }
 
     private static function recognizeCaptcha($url)
     {
-        return \Yii::app()->captcha->get($url, true);
+        $rucaptcha = new \Rucaptcha\Client('b835aad4c2987100a5c8298d9e3494ec');
+        return $rucaptcha->recognize(file_get_contents($url));
     }
 
     public static function get($number, $parsePDF = true, $force = false)
@@ -210,20 +224,21 @@ class CompanyInfo
             return $cache;
         } elseif (!$force && ($file = self::getStorageFile(self::$_number)) && $parsePDF) {
             self::getPdfParser()->parseFile($file);
-            self::formArray();
+            self::parseFile();
             $data = self::rawInfoAsObject();
             return $data;
         }
-
         $captcha = self::extractCaptcha();
+
 
         $fileUrl = $captcha["url"];
         $captchaToken = $captcha["token"];
         $recognizedCaptcha = self::recognizeCaptcha($fileUrl);
-
         $json = self::getFileUrl(self::$_number, !$isIp, $captchaToken, $recognizedCaptcha);
         if (array_key_exists("ERRORS", $json)) {
-            throw new companyInfoException(print_r($json["ERRORS"], 1));
+            var_dump($json);
+            exit;
+//            throw new companyInfoException(print_r($json["ERRORS"], 1));
         } else {
             if ($parsePDF) {
                 $file = self::DOMAIN . "/download/" . $json["rows"][0]["T"];
@@ -240,7 +255,10 @@ class CompanyInfo
 
     private static function saveFile($path)
     {
-        $tmpFileName = tempnam(\Yii::app()->runtimePath, "pdf");
+        $tmpFileName = tempnam(__DIR__ . DIRECTORY_SEPARATOR . 'tmp', "pdf");
+
+        var_dump($path);
+        exit;
         $content = self::getParser()->getContent($path);
         if (self::getParser()->HTTP_CODE !== 200) {
             $document = \phpQuery::newDocumentHTML($content);
@@ -253,33 +271,30 @@ class CompanyInfo
 
     public static function getStorageFile($number)
     {
-        $file = Yii::getPathOfAlias(self::$filesFolder) . DIRECTORY_SEPARATOR . $number . '.pdf';
-        if (file_exists($file)) {
-            return $file;
-        } else {
-            return false;
-        }
+//        $file = Yii::getPathOfAlias(self::$filesFolder) . DIRECTORY_SEPARATOR . $number . '.pdf';
+//        if (file_exists($file)) {
+//            return $file;
+//        } else {
+//            return false;
+//        }
     }
 
     private static function storageFile($path)
     {
-        if (!is_dir($folder = Yii::getPathOfAlias(self::$filesFolder))) {
-            mkdir($folder, 0777, true);
-        }
-        $file = $folder . DIRECTORY_SEPARATOR . self::$_number . '.pdf';
-        if (!file_exists($file) && file_exists($path)) {
-            rename($path, $file);
-        } elseif (file_exists($path)) {
-            @unlink($path);
-        }
+//        if (!is_dir($folder = Yii::getPathOfAlias(self::$filesFolder))) {
+//            mkdir($folder, 0777, true);
+//        }
+//        $file = $folder . DIRECTORY_SEPARATOR . self::$_number . '.pdf';
+//        if (!file_exists($file) && file_exists($path)) {
+//            rename($path, $file);
+//        } elseif (file_exists($path)) {
+//            @unlink($path);
+//        }
     }
 
-    /**
-     * @return \ext\companyInfo\CompanyData
-     */
     public static function rawInfoAsObject()
     {
-        $data = new \ext\companyInfo\CompanyData(self::$_rawInfo);
+        $data = new Data(self::$_rawInfo);
         return $data;
     }
 
@@ -291,32 +306,32 @@ class CompanyInfo
      */
     public static function file($file)
     {
-        try {
-            $path = self::saveFile($file);
-            self::getPdfParser()->parseFile($path);
-            self::formArray();
-            self::storageFile($path);
-        } catch (Exception $e) {
-            throw new Exception($e->getMessage());
-        }
-        self::debug(self::$_rawInfo);
-        return self::$_rawInfo;
+//        try {
+//            $path = self::saveFile($file);
+//            self::getPdfParser()->parseFile($path);
+//            self::formArray();
+//            self::storageFile($path);
+//        } catch (Exception $e) {
+//            throw new Exception($e->getMessage());
+//        }
+//        self::debug(self::$_rawInfo);
+//        return self::$_rawInfo;
     }
 
     private static function debug($content, $prefix = null, $append = false)
     {
-        if (self::$debug) {
-            $name = self::$_number . ($prefix ? "_" . $prefix : "") . ".txt";
-            $folder = Yii::getPathOfAlias(self::$debugFolder);
-            if (!is_dir($folder)) {
-                mkdir($folder, 0777, true);
-            }
-            if ($append) {
-                file_put_contents($folder . DIRECTORY_SEPARATOR . $name, $content . "\n", FILE_APPEND);
-            } else {
-                file_put_contents($folder . DIRECTORY_SEPARATOR . $name, print_r($content, 1));
-            }
-        }
+//        if (self::$debug) {
+//            $name = self::$_number . ($prefix ? "_" . $prefix : "") . ".txt";
+//            $folder = Yii::getPathOfAlias(self::$debugFolder);
+//            if (!is_dir($folder)) {
+//                mkdir($folder, 0777, true);
+//            }
+//            if ($append) {
+//                file_put_contents($folder . DIRECTORY_SEPARATOR . $name, $content . "\n", FILE_APPEND);
+//            } else {
+//                file_put_contents($folder . DIRECTORY_SEPARATOR . $name, print_r($content, 1));
+//            }
+//        }
     }
 
     public static function fixLineArrayMap($elem)
@@ -391,44 +406,69 @@ class CompanyInfo
         return $result;
     }
 
-    private static function formArray()
+    private static function isNumber($number, $line)
+    {
+        if (preg_match('/^[0-9]+/', $line, $m)) {
+            return $m[0] == $number;
+        } else {
+            return false;
+        }
+    }
+
+    public static function parseFile($file)
     {
         $res = array();
-        foreach (self::$_pdfParser->pdf->getPages() as $page) {
+        $x = 1;
+        $flag = false;
+        $concat = '';
+        foreach (self::getPdfParser()->parseFile($file)->getPages() as $page) {
             $content = trim($page->getText());
-
-            $arr = explode("\n", $content);
-            $cline = '';
-            $group = "";
-            $isSubElement = false;
-            $SubElement = 0;
-            foreach ($arr as $line) {
+            foreach (explode("\n", $content) as $line) {
                 self::fixParserTextBugs($line);
-                self::debug($line, "raw", FILE_APPEND);
-                $arrCline = explode(chr(9), $cline);
-                if ((!is_numeric($arrCline[0]) && $cline) || ($isSubElement = is_numeric(trim($cline)))) {
-                    if ($isSubElement) {
-                        $SubElement = (int)trim($cline);
-                    } else {
-                        $group .= ' ' . trim($cline);
+                if (self::isNumber($x, $line)) {
+                    $res[] = $line;
+                    $flag = true;
+                    $concat = '';
+                    $x++;
+                } elseif ($flag) {
+                    $res[$x-2] .= ' ' . $line;
+                }
+            };
+//var_dump($arr);
+//            exit;
+            /*
+                        $cline = '';
+                        $group = "";
+                        $isSubElement = false;
                         $SubElement = 0;
-                    }
-                    $cline = "";
-                }
-
-                if (!$cline || is_numeric($arrCline[0])) {
-                    $cline .= ' ' . ltrim($line);
-                    $arrCline = explode(chr(9), $cline);
-                }
-
-                if (count($arrCline) == 4) {
-                    self::checkGroup($group, $SubElement);
-                    self::push($res, self::$_group, self::$_groupSub, $arrCline[1], $arrCline[2]);
-                    $cline = '';
-                    $group = '';
-                }
-            }
+                        foreach ($arr as $line) {
+                            self::fixParserTextBugs($line);
+                            $arrCline = explode(chr(9), $cline);
+                            if ((!is_numeric($arrCline[0]) && $cline) || ($isSubElement = is_numeric(trim($cline)))) {
+                                if ($isSubElement) {
+                                    $SubElement = (int)trim($cline);
+                                } else {
+                                    $group .= ' ' . trim($cline);
+                                    $SubElement = 0;
+                                }
+                                $cline = "";
+                            }
+                            if (!$cline || is_numeric($arrCline[0])) {
+                                $cline .= ' ' . ltrim($line);
+                                $arrCline = explode(chr(9), $cline);
+                            }
+                            if (count($arrCline) == 4) {
+                                self::checkGroup($group, $SubElement);
+                                self::push($res, self::$_group, self::$_groupSub, $arrCline[1], $arrCline[2]);
+                                $cline = '';
+                                $group = '';
+                            }
+                        }
+            */
         }
+        file_put_contents('t2.txt', print_r($res, 1));
+        print_r($res);
+        exit;
         array_shift($res);
         return self::$_rawInfo = $res;
     }
@@ -509,20 +549,24 @@ class CompanyInfo
         }
     }
 
+    /**
+     * @return Parser
+     */
     public static function getPdfParser()
     {
         if (!self::$_pdfParser) {
-            self::$_pdfParser = new \PDFParser();
+            self::$_pdfParser = new Parser();
         }
         return self::$_pdfParser;
     }
 
+    /**
+     * @return Client
+     */
     public static function getParser()
     {
         if (!self::$_parser) {
-            self::$_parser = new CParser();
-//            self::$_parser->proxyHost = '127.0.0.1';
-//            self::$_parser->proxyPort = '8888';
+            self::$_parser = new Client();
         }
         return self::$_parser;
     }

@@ -4,7 +4,8 @@
   "type": "component",
   "keywords": [
     "component",
-    "kontur"
+    "kontur",
+    "egrul.nalog.ru"
   ],
   "minimum-stability": "dev",
   "license": "MIT",
@@ -16,10 +17,12 @@
   ],
   "require": {
     "electrolinux/phpquery": "^0.9.6",
-    "danielstjules/stringy": "^2.1"
+    "danielstjules/stringy": "^2.1",
+    "smalot/pdfparser": "^0.9.26",
+    "guzzlehttp/guzzle": "^6.2",
+    "gladyshev/rucaptcha-client": "^1.0"
   },
   "require-dev": {
-    "carono/murl": "*"
   },
   "autoload": {
     "psr-4": {
