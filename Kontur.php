@@ -113,9 +113,11 @@ class Kontur extends absKontur
             $data = self::parse($content);
             $result['count'] = 1;
             $result['companies'][] = [
-                'ogrn'        => $data->ogrn,
-                'short_name'  => $data->short_name,
-                'description' => ''
+                'ogrn'          => $data->ogrn,
+                'short_name'    => $data->short_name,
+                'description'   => '',
+                'inn'           => $data->inn,
+                'register_date' => $data->register_date
             ];
         } else {
             $q = \phpQuery::newDocument($content);
@@ -123,10 +125,14 @@ class Kontur extends absKontur
             $result['count'] = isset($m[0]) ? $m[0] : 0;
             $result['companies'] = [];
             foreach ($q->find('.marB15') as $companyBlock) {
+                preg_match('/\d+/', pq($companyBlock)->find('.ind1em')->eq(0)->text(), $inn);
+                preg_match('/[\d.]+/', pq($companyBlock)->find('[title="Дата регистрации"]')->text(), $date);
                 $result['companies'][] = [
-                    'ogrn'        => pq($companyBlock)->attr('data-ogrn'),
-                    'short_name'  => strip_tags(pq($companyBlock)->find('.marR12')),
-                    'description' => pq($companyBlock)->find('p')->text()
+                    'ogrn'          => pq($companyBlock)->attr('data-ogrn'),
+                    'short_name'    => strip_tags(pq($companyBlock)->find('.marR12')),
+                    'description'   => pq($companyBlock)->find('p')->text(),
+                    'inn'           => isset($inn[0]) ? $inn[0] : null,
+                    'register_date' => $date[0] ? \DateTime::createFromFormat('d.m.Y', $date[0])->format('Y-m-d') : ''
                 ];
             }
         }
@@ -329,8 +335,8 @@ class Kontur extends absKontur
         $create_date = strip_tags($phpQuery->html());
         $arr = explode(':', $create_date);
         foreach ($arr as $path) {
-            if ($timestamp = strtotime($path)) {
-                return date('Y-m-d H:i:s', $timestamp);
+            if ($timestamp = strtotime(trim($path))) {
+                return date('Y-m-d', $timestamp);
             }
         }
         return "";
